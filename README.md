@@ -74,7 +74,7 @@ The existing `wpgp` Bash program and `install.sh` remain available. They require
 
 ## Windows installer
 
-The standalone console installer source and build instructions are in [`installer/`](https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool/tree/main/installer). It downloads the current Windows PowerShell app from this public repository and adds `wpgp` to the installing user's PATH. GnuPG (Gpg4win) is a separate prerequisite.
+The standalone console installer is available as [`wpgp-setup.exe`](https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool/blob/main/wpgp-setup.exe), with source and build instructions in [`installer/`](https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool/tree/main/installer). It downloads the current Windows PowerShell app from this public repository and adds `wpgp` to the installing user's PATH. If GnuPG is missing, setup asks before downloading and opening Gpg4win's interactive installer.
 
 ## Credits
 
