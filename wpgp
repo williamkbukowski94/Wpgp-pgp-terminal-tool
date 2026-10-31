@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+# Wpgp: a guided terminal interface for GnuPG.
+
+set -uo pipefail
+IFS=$'\n\t'
+
+VERSION='0.1.0'
+GREEN=$'\033[1;92m'
+RED=$'\033[1;91m'
+WHITE=$'\033[1;97m'
+DIM=$'\033[2m'
+RESET=$'\033[0m'
+TMP_ROOT=''
+
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  C_GREEN=$GREEN C_RED=$RED C_WHITE=$WHITE C_DIM=$DIM C_RESET=$RESET
+else
+  C_GREEN='' C_RED='' C_WHITE='' C_DIM='' C_RESET=''
+fi
+
+cleanup() {
+  [[ -n "$TMP_ROOT" && -d "$TMP_ROOT" ]] && rm -rf -- "$TMP_ROOT"
+}
+trap cleanup EXIT HUP INT TERM
+
+need_gpg() {
+  if ! command -v gpg >/dev/null 2>&1; then
+    printf '%sError:%s GnuPG (gpg) is required. Install it with your system package manager.\n' "$C_RED" "$C_RESET" >&2
+    return 1
+  fi
+}
+
+init_tmp() {
+  if [[ -z "$TMP_ROOT" ]]; then
+    umask 077
+    TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/wpgp.XXXXXXXX") || return 1
+    chmod 700 "$TMP_ROOT"
+  fi
+}
+
+clear_page() {
+  if [[ -t 1 ]]; then clear; fi
+}
+
+pause() {
+  printf '\n%sPress Enter to continue…%s' "$C_DIM" "$C_RESET"
+  IFS= read -r _ || true
+}
+
+banner() {
+  printf '%s+--------------------------------------------------------------+%s\n' "$C_WHITE" "$C_RESET"
+  printf '%s|%s  %sW P G P%s  //  OPENPGP TERMINAL                         %s|%s\n' "$C_WHITE" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_WHITE" "$C_RESET"
+  printf '%s+--------------------------------------------------------------+%s\n' "$C_WHITE" "$C_RESET"
+}
+
+ok() { printf '%s[✓] %s%s\n' "$C_GREEN" "$*" "$C_RESET"; }
+err() { printf '%s[!] %s%s\n' "$C_RED" "$*" "$C_RESET" >&2; }
+
+editor_file() {
+  local label=$1 out=$2 editor
+  local -a editor_cmd
+  editor=${VISUAL:-${EDITOR:-nano}}
+  IFS=' ' read -r -a editor_cmd <<< "$editor"
+  if ((${#editor_cmd[@]} == 0)) || ! command -v "${editor_cmd[0]}" >/dev/null 2>&1; then
+    err "Editor '$editor' was not found. Install nano or set EDITOR."
+    return 1
+  fi
+  : > "$out"
+  chmod 600 "$out"
+  printf '%s%s%s\nPaste or type %s in the editor, then save and exit.' "$C_GREEN" "$label" "$C_RESET" "$label"
+  "${editor_cmd[@]}" "$out"
+  [[ -s "$out" ]] || { err "No content was entered."; return 1; }
+}
+
+valid_basename() {
+  [[ -n "$1" && "$1" != */* && "$1" != '.' && "$1" != '..' ]]
+}
+
+search_file() {
+  local prompt=$1 input choice i found
+  local -a roots=() matches=()
+  printf '%s' "$prompt"
+  IFS= read -r input || return 1
+  valid_basename "$input" || { err 'Enter a filename only (no folder path).'; return 1; }
+
+  if [[ -n "${WPGP_SEARCH_DIRS:-}" ]]; then
+    local rest=$WPGP_SEARCH_DIRS
+    while [[ -n "$rest" ]]; do
+      roots+=("${rest%%:*}")
+      [[ "$rest" == *:* ]] || break
+      rest=${rest#*:}
+    done
+  else
+    roots=("$HOME")
+  fi
+  for i in "${roots[@]}"; do
+    [[ -d "$i" ]] || continue
+    while IFS= read -r -d '' found; do matches+=("$found"); done < <(find "$i" -type f -name "$input" -print0 2>/dev/null)
+  done
+  # Remove duplicate paths if configured roots overlap.
+  if ((${#matches[@]})); then
+    local -A seen=()
+    local -a unique=()
+    for i in "${matches[@]}"; do [[ -n ${seen[$i]:-} ]] || { unique+=("$i"); seen[$i]=1; }; done
+    matches=("${unique[@]}")
+  fi
+  if ((${#matches[@]} == 0)); then err "No file named '$input' found in the search folders."; return 1; fi
+  if ((${#matches[@]} == 1)); then REPLY=${matches[0]}; return 0; fi
+  printf '\n%sSeveral files match. Choose one:%s\n' "$C_GREEN" "$C_RESET"
+  for i in "${!matches[@]}"; do printf '  %d) %s\n' "$((i+1))" "${matches[$i]}"; done
+  printf 'Number (or q to cancel): '
+  IFS= read -r choice || return 1
+  [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#matches[@]})) || { err 'Selection cancelled.'; return 1; }
+  REPLY=${matches[$((choice-1))]}
+}
+
+choose_input() {
+  local what=$1 path
+  while :; do
+    printf '\n%s%s%s\n' "$C_GREEN" "$what" "$C_RESET"
+    printf '  a) Paste/type in nano\n  b) Find a saved file by name\n  q) Cancel\nChoice: '
+    IFS= read -r choice || return 1
+    case "$choice" in
+      a|A)
+        if [[ $what == *'public key'* ]]; then path="$TMP_ROOT/recipient.asc"; else path="$TMP_ROOT/message.txt"; fi
+        editor_file "$what" "$path" || return 1
+        REPLY=$path; return 0 ;;
+      b|B)
+        search_file 'Filename (searches your home folder, or WPGP_SEARCH_DIRS): ' || continue
+        REPLY=$REPLY; return 0 ;;
+      q|Q) return 1 ;;
+      *) err 'Choose a, b, or q.' ;;
+    esac
+  done
+}
+
+choose_key() {
+  local keyfile=$1 fingerprint
+  init_tmp || return 1
+  printf '\nImporting the selected public key into your GnuPG keyring.\n'
+  if ! gpg --batch --import "$keyfile"; then err 'GnuPG could not import that public key.'; return 1; fi
+  printf '\n%sAvailable recipient keys:%s\n' "$C_GREEN" "$C_RESET"
+  gpg --list-keys --keyid-format long
+  printf '\nEnter the recipient key fingerprint, key ID, or email: '
+  IFS= read -r fingerprint || return 1
+  [[ -n "$fingerprint" ]] || { err 'A recipient is required.'; return 1; }
+  WPGP_RECIPIENT=$fingerprint
+}
+
+encrypt_flow() {
+  local manual=${1:-false} keyfile msgfile output dest answer signopt=''
+  init_tmp || return 1
+  if $manual; then
+    keyfile="$TMP_ROOT/recipient.asc"
+    msgfile="$TMP_ROOT/message.txt"
+    editor_file 'recipient public key' "$keyfile" || return 1
+    ok 'Public key captured.'
+    editor_file 'message' "$msgfile" || return 1
+    ok 'Message captured.'
+  else
+    choose_input 'Recipient public key' || return 1; keyfile=$REPLY
+    ok 'Public key selected.'
+    choose_input 'Message' || return 1; msgfile=$REPLY
+    ok 'Message selected.'
+  fi
+  choose_key "$keyfile" || return 1
+  printf '\nSign this message with one of your private keys? [y/N] '
+  IFS= read -r answer || return 1
+  case "$answer" in y|Y) signopt='--sign' ;; esac
+  printf '\nEncrypt for %s? [y/N] ' "$WPGP_RECIPIENT"
+  IFS= read -r answer || return 1
+  [[ "$answer" == y || "$answer" == Y ]] || { err 'Encryption cancelled.'; return 1; }
+  output="$TMP_ROOT/message.asc"
+  if ! gpg --armor --output "$output" --encrypt $signopt --recipient "$WPGP_RECIPIENT" -- "$msgfile"; then
+    err 'Encryption failed.'; return 1
+  fi
+  clear_page
+  banner
+  printf '\n%sENCRYPTED MESSAGE%s\n\n' "$C_GREEN" "$C_RESET"
+  cat -- "$output"
+  printf '\n\nSave encrypted file in Documents? [y/N] '
+  IFS= read -r answer || answer=n
+  if [[ "$answer" == y || "$answer" == Y ]]; then
+    local docs="$HOME/Documents" name
+    [[ -d "$docs" ]] || docs=$HOME
+    printf 'Output filename (default: wpgp-encrypted.asc): '
+    IFS= read -r name || name=''
+    name=${name:-wpgp-encrypted.asc}
+    if ! valid_basename "$name"; then err 'Enter a filename only.'; else
+      [[ "$name" == *.asc ]] || name="$name.asc"
+      dest="$docs/$name"
+      if [[ -e "$dest" ]]; then err "File already exists: $dest"; else cp -- "$output" "$dest" && chmod 600 "$dest" && ok "Saved $dest"; fi
+    fi
+  fi
+  printf '\nHave you saved or copied the encrypted message? [y/N] '
+  IFS= read -r answer || answer=n
+  [[ "$answer" == y || "$answer" == Y ]] || { printf '\nThe encrypted message remains above.\n'; pause; }
+}
+
+decrypt_flow() {
+  local manual=${1:-false} msgfile output answer name dest
+  init_tmp || return 1
+  if $manual; then
+    msgfile="$TMP_ROOT/encrypted.asc"
+    editor_file 'encrypted message' "$msgfile" || return 1
+  else
+    choose_input 'Encrypted message (.asc)' || return 1; msgfile=$REPLY
+  fi
+  output="$TMP_ROOT/decrypted.txt"
+  clear_page
+  if ! gpg --output "$output" --decrypt "$msgfile"; then err 'Decryption or signature verification failed.'; return 1; fi
+  printf '\n%sDECRYPTED MESSAGE%s\n\n' "$C_GREEN" "$C_RESET"
+  cat -- "$output"
+  printf '\n\nSave plaintext in Documents? [y/N] '
+  IFS= read -r answer || answer=n
+  if [[ "$answer" == y || "$answer" == Y ]]; then
+    dest="$HOME/Documents"; [[ -d "$dest" ]] || dest=$HOME
+    printf 'Output filename (default: wpgp-decrypted.txt): '
+    IFS= read -r name || name=''
+    name=${name:-wpgp-decrypted.txt}
+    if ! valid_basename "$name"; then err 'Enter a filename only.'; else
+      if [[ -e "$dest/$name" ]]; then err "File already exists: $dest/$name"; else cp -- "$output" "$dest/$name" && chmod 600 "$dest/$name" && ok "Saved $dest/$name"; fi
+    fi
+  fi
+  printf '\nHave you saved or copied the message? [y/N] '
+  IFS= read -r answer || answer=n
+  [[ "$answer" == y || "$answer" == Y ]] || pause
+}
+
+keys_screen() {
+  clear_page; banner
+  printf '\n%sYOUR PUBLIC KEYS%s\n' "$C_GREEN" "$C_RESET"
+  gpg --list-keys --keyid-format long 2>&1 || true
+  printf '\n%sYOUR PRIVATE KEYS (secret key metadata only)%s\n' "$C_GREEN" "$C_RESET"
+  gpg --list-secret-keys --keyid-format long 2>&1 || true
+  printf '\nFingerprint verification: compare the full fingerprint with your contact through a trusted channel.\n'
+  while :; do
+    printf '\nType quit or exit to return to the main menu: '
+    IFS= read -r answer || return
+    case "$answer" in quit|exit|q|Q) return ;; *) err 'Type quit or exit.' ;; esac
+  done
+}
+
+new_key_flow() {
+  local answer uid email comment params
+  init_tmp || return 1
+  printf '\nCreate a new key pair? [y/N] '
+  IFS= read -r answer || return
+  [[ "$answer" == y || "$answer" == Y ]] || return
+  printf '%sThis adds a new pair to your GnuPG keyring. Existing keys are not deleted.%s\n' "$C_RED" "$C_RESET"
+  printf 'Are you sure you want to continue? [y/N] '
+  IFS= read -r answer || return
+  [[ "$answer" == y || "$answer" == Y ]] || return
+  printf 'Name: '; IFS= read -r uid || return
+  printf 'Email: '; IFS= read -r email || return
+  printf 'Comment (optional): '; IFS= read -r comment || return
+  [[ -n "$uid" && -n "$email" ]] || { err 'Name and email are required.'; return 1; }
+  params="$TMP_ROOT/key-params"
+  {
+    printf 'Key-Type: RSA\nKey-Length: 3072\nName-Real: %s\nName-Email: %s\n' "$uid" "$email"
+    [[ -n "$comment" ]] && printf 'Name-Comment: %s\n' "$comment"
+    printf 'Expire-Date: 2y\n%commit\n'
+  } > "$params"
+  printf '\nGnuPG will ask you to set a passphrase.\n'
+  gpg --batch --generate-key "$params" && ok 'New key pair created.'
+  printf '\nExisting keys remain available. To remove one, use GnuPG only after securely backing it up.\n'
+  pause
+}
+
+main_menu() {
+  need_gpg || exit 1
+  while :; do
+    clear_page; banner
+    printf '\n%sWELCOME TO WPGP%s  %s v%s%s\n\n' "$C_GREEN" "$C_RESET" "$C_DIM" "$VERSION" "$C_RESET"
+    printf '  %sE%s  Encrypt a message\n  %sD%s  Decrypt a message\n  %sK%s  Display my keys\n  %sN%s  Make a new key pair\n  %sQ%s  Quit\n\n' "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET"
+    printf 'wpgp> '
+    IFS= read -r choice || break
+    case "$choice" in
+      e|E|encrypt) encrypt_flow false || pause ;;
+      d|D|decrypt) decrypt_flow false || pause ;;
+      k|K|keys) keys_screen ;;
+      n|N|new) new_key_flow || pause ;;
+      q|Q|quit|exit) break ;;
+      *) err 'Choose E, D, K, N, or Q.'; pause ;;
+    esac
+  done
+  clear_page
+  printf '%sWpgp session closed.%s\n' "$C_GREEN" "$C_RESET"
+}
+
+case "${1:-}" in
+  encrypt) need_gpg || exit 1; init_tmp || exit 1; [[ "${2:-}" == --manual ]] && encrypt_flow true || encrypt_flow false ;;
+  decrypt) need_gpg || exit 1; init_tmp || exit 1; [[ "${2:-}" == --manual ]] && decrypt_flow true || decrypt_flow false ;;
+  --version|-v) printf 'Wpgp %s\n' "$VERSION" ;;
+  --help|-h)
+    printf 'Usage: wpgp [encrypt [--manual] | decrypt [--manual] | --help | --version]\n'
+    printf 'Run wpgp with no arguments for the interactive menu.\n'
+    ;;
+  '') main_menu ;;
+  *) printf 'Unknown command: %s\nRun wpgp --help for usage.\n' "$1" >&2; exit 2 ;;
+esac
