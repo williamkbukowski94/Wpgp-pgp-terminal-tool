@@ -1,12 +1,14 @@
 using System;
 using System.IO;
 using System.Net;
+using System.Diagnostics;
 using Microsoft.Win32;
 
 internal static class WpgpInstaller
 {
     private const string ScriptUrl = "https://raw.githubusercontent.com/williamkbukowski94/Wpgp-pgp-terminal-tool/main/windows/wpgp.ps1";
     private const string PathKey = @"Environment";
+    private const string Gpg4winInstallerUrl = "https://files.gpg4win.org/gpg4win-latest.exe";
 
     private static void Frame(string text, ConsoleColor color)
     {
@@ -26,9 +28,79 @@ internal static class WpgpInstaller
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Codex", "wpgp");
     }
 
-    private static void Install()
+    private static string FindGpg()
+    {
+        string path = Environment.GetEnvironmentVariable("Path") ?? "";
+        foreach (string entry in path.Split(';'))
+        {
+            string candidate = Path.Combine(entry.Trim(), "gpg.exe");
+            if (File.Exists(candidate)) return candidate;
+        }
+        string[] known = {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "GnuPG", "bin", "gpg.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "GnuPG", "bin", "gpg.exe")
+        };
+        foreach (string candidate in known)
+            if (File.Exists(candidate)) return candidate;
+        return null;
+    }
+
+    private static bool AskToInstallGpg4win()
+    {
+        if (FindGpg() != null)
+        {
+            Console.WriteLine("GnuPG was found. Skipping Gpg4win installation.");
+            return true;
+        }
+
+        Console.WriteLine("GnuPG was not found. wpgp needs Gpg4win for PGP operations.");
+        Console.WriteLine("The setup can download the official Gpg4win installer and open its interactive setup.");
+        Console.Write("Install Gpg4win now? [y/N] ");
+        string answer = Console.ReadLine();
+        if (!String.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) &&
+            !String.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Gpg4win was skipped. wpgp will install, but PGP actions need GnuPG.");
+            return false;
+        }
+
+        string installerPath = Path.Combine(Path.GetTempPath(), "gpg4win-setup.exe");
+        try
+        {
+            Console.WriteLine("Downloading Gpg4win from the official Gpg4win site...");
+            using (WebClient client = new WebClient())
+                client.DownloadFile(Gpg4winInstallerUrl, installerPath);
+            Console.WriteLine("Starting Gpg4win's interactive installer. Follow its prompts and approve Windows' UAC prompt if shown.");
+            ProcessStartInfo info = new ProcessStartInfo();
+            info.FileName = installerPath;
+            info.UseShellExecute = true;
+            using (Process process = Process.Start(info))
+                process.WaitForExit();
+            if (FindGpg() != null)
+            {
+                Console.WriteLine("GnuPG is ready.");
+                return true;
+            }
+            Console.WriteLine("Gpg4win setup finished, but gpg.exe was not found. Complete its setup, then rerun this installer.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Gpg4win was not installed: " + ex.Message);
+            Console.WriteLine("Continuing with wpgp setup. PGP actions need GnuPG.");
+            return false;
+        }
+        finally
+        {
+            try { if (File.Exists(installerPath)) File.Delete(installerPath); }
+            catch { }
+        }
+    }
+
+    private static bool Install()
     {
         ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+        bool gpgReady = AskToInstallGpg4win();
         byte[] script;
         using (WebClient client = new WebClient())
             script = client.DownloadData(ScriptUrl);
@@ -54,6 +126,7 @@ internal static class WpgpInstaller
                 key.SetValue("Path", updated, RegistryValueKind.ExpandString);
             }
         }
+        return gpgReady;
     }
 
     public static int Main()
@@ -68,12 +141,13 @@ internal static class WpgpInstaller
         try
         {
             Console.WriteLine("Downloading wpgp from GitHub...");
-            Install();
+            bool gpgReady = Install();
             Console.WriteLine();
             Frame("wpgp is now installed.", ConsoleColor.Green);
             Console.WriteLine();
             Console.WriteLine("Open Windows PowerShell and type 'wpgp' in any directory to run it.");
-            Console.WriteLine("GnuPG (Gpg4win) must be installed separately for PGP operations.");
+            if (!gpgReady)
+                Console.WriteLine("Gpg4win was skipped or not completed; install it later to enable PGP operations.");
             Console.WriteLine();
             Console.WriteLine("Press any key to exit.");
             Console.ReadKey(true);
