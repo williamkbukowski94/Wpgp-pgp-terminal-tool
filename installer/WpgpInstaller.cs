@@ -109,8 +109,10 @@ internal static class WpgpInstaller
 
         string directory = InstallDirectory();
         Directory.CreateDirectory(directory);
-        File.WriteAllBytes(Path.Combine(directory, "wpgp.ps1"), script);
-        string launcher = "@echo off\r\npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"%~dp0wpgp.ps1\" %*\r\n";
+        File.WriteAllBytes(Path.Combine(directory, "wpgp-core.ps1"), script);
+        string oldScript = Path.Combine(directory, "wpgp.ps1");
+        if (File.Exists(oldScript)) File.Delete(oldScript);
+        string launcher = "@echo off\r\npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"%~dp0wpgp-core.ps1\" %*\r\n";
         File.WriteAllText(Path.Combine(directory, "wpgp.cmd"), launcher);
 
         using (RegistryKey key = Registry.CurrentUser.OpenSubKey(PathKey, true))
@@ -140,6 +142,8 @@ internal static class WpgpInstaller
         Console.WriteLine();
         try
         {
+            Console.WriteLine();
+            Console.WriteLine("Configuring Windows for this user:");
             Console.WriteLine("Downloading wpgp from GitHub...");
             bool gpgReady = Install();
             Console.WriteLine();
@@ -148,6 +152,7 @@ internal static class WpgpInstaller
             Console.WriteLine("Open Windows PowerShell and type 'wpgp' in any directory to run it.");
             if (!gpgReady)
                 Console.WriteLine("Gpg4win was skipped or not completed; install it later to enable PGP operations.");
+            Console.WriteLine("The launcher uses a process-only execution-policy bypass; machine policy is not changed.");
             Console.WriteLine();
             Console.WriteLine("Press any key to exit.");
             Console.ReadKey(true);
