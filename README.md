@@ -72,6 +72,10 @@ The existing `wpgp` Bash program and `install.sh` remain available. They require
 - Message text is entered in the terminal and may remain in terminal scrollback. Avoid shared or recorded sessions.
 - Decryption and key generation may invoke GnuPG's pinentry/passphrase prompt.
 
+## Windows installer
+
+The standalone console installer source and build instructions are in [`installer/`](https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool/tree/main/installer). It downloads the current Windows PowerShell app from this public repository and adds `wpgp` to the installing user's PATH. GnuPG (Gpg4win) is a separate prerequisite.
+
 ## Credits
 
 Written by WB for all open source use.
