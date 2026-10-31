@@ -22,7 +22,11 @@ $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $pathEntries = @($userPath -split ';' | Where-Object { $_ })
 if (-not ($pathEntries | Where-Object { $_.TrimEnd('\') -ieq $installDirectory.TrimEnd('\') })) {
     $pathEntries += $installDirectory
-    [Environment]::SetEnvironmentVariable('Path', ($pathEntries -join ';'), 'User')
+    try {
+        [Environment]::SetEnvironmentVariable('Path', ($pathEntries -join ';'), 'User')
+    } catch {
+        Write-Warning 'Windows blocked the per-user PATH update in this session.'
+    }
 }
 $processEntries = @($env:Path -split ';' | Where-Object { $_ })
 if (-not ($processEntries | Where-Object { $_.TrimEnd('\') -ieq $installDirectory.TrimEnd('\') })) {
@@ -30,6 +34,10 @@ if (-not ($processEntries | Where-Object { $_.TrimEnd('\') -ieq $installDirector
 }
 
 Write-Host "Installed wpgp to $installedScript" -ForegroundColor Green
-Write-Host "Added $installDirectory to your user PATH" -ForegroundColor Green
-Write-Host 'Run wpgp in this window or any new PowerShell window.' -ForegroundColor Cyan
+if ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' | Where-Object { $_.TrimEnd('\') -ieq $installDirectory.TrimEnd('\') }) {
+    Write-Host "Added $installDirectory to your user PATH. Run wpgp in a new PowerShell window." -ForegroundColor Cyan
+} else {
+    Write-Host "Add this folder to your user PATH to run wpgp by name: $installDirectory" -ForegroundColor Yellow
+    Write-Host "Until then, run: & '$installedScript'" -ForegroundColor Cyan
+}
 
