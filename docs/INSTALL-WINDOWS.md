@@ -23,25 +23,25 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\install-windows.ps1
 ```
 
-The process-scoped execution policy change lasts only for that PowerShell window. The installer needs no elevation. It copies `windows\wpgp.ps1` to `Documents\Codex\wpgp`, creates a command launcher, and tries to add the folder to your per-user `PATH`. If Windows allows that change, open a new PowerShell window and run `wpgp`. If environment-variable changes are blocked, add that folder to PATH manually or invoke the script by full path:
+The process-scoped execution policy change lasts only for that PowerShell window. The installer needs no elevation for wpgp itself. It checks for GnuPG; if missing, it asks before downloading the official Gpg4win installer and launching its interactive setup. It installs the app to `Documents\Codex\wpgp`, creates a `wpgp.cmd` launcher that applies execution-policy bypass only to that wpgp child process, and adds the folder to your per-user `PATH`. It does not change the machine execution policy. Open a new PowerShell window and run `wpgp`.
 
 ```powershell
 & "$env:USERPROFILE\Documents\Codex\wpgp\wpgp.ps1"
 ```
 
-The launcher invokes the script directly. GnuPG stores its keys in your account's normal GnuPG home directory; wpgp does not make another key store.
+The launcher invokes Windows PowerShell with a process-only execution-policy bypass. GnuPG stores keys in your account's normal GnuPG home directory; wpgp does not create another key store.
 
 ## Use
 
-- **Encrypt**: import or otherwise obtain the recipient public key first. Enter the recipient key's email, key ID, or full fingerprint, then enter message lines. A line containing only `.` ends input. With auto-sign enabled, select your own secret key when prompted.
-- **Decrypt**: provide a path to an encrypted message file. GnuPG uses your secret key and may prompt for its passphrase.
+- **Encrypt**: choose an existing recipient key, import one from a file, or paste an ASCII-armored public key. Enter a key email, ID, or fingerprint, then type a message or read it from a file. A line containing only `.` ends typed input. With auto-sign enabled, select your secret key when prompted. The armored result is saved and displayed for review.
+- **Decrypt**: choose an encrypted file or paste an ASCII-armored message. GnuPG uses your secret key and may prompt for its passphrase. The plaintext appears in the terminal; confirm with `y` or `n` that you have read it.
 - **Key pairs**: display public and secret key listings, or create a key pair. Key generation uses GnuPG defaults and may open pinentry.
 - **Import public key**: choose filename search, direct path, or paste ASCII-armored key text. Imported keys enter your normal GnuPG keyring. The filename search checks the user profile, Desktop, and current directory recursively and shows matching paths.
-- **Sign**: create a clear-signed text message using your secret key.
-- **Verify**: check a signed message file. Treat a valid signature as proof that the matching private key signed the data; independently verify the signer fingerprint to associate it with a person.
+- **Sign**: create a clear-signed message from typed text or a file using your secret key. The result is saved and shown for review.
+- **Verify**: check a signed file or pasted message. Treat a valid signature as proof that the matching private key signed the data; independently verify the signer fingerprint to associate it with a person.
 - **Export**: save an ASCII-armored copy of your public key to share.
 
-The automatic-sign toggle is off at startup and lasts only for the current run. Signing always uses a secret/private key; recipients need the matching public key to verify. Encryption uses a recipient public key and decryption requires its corresponding secret key.
+The automatic-sign toggle is off at startup and lasts only for the current run. Option 6 toggles it and the menu shows its state. Type `exit` or `quit` at any wpgp prompt to cancel the current action and return to the menu; at the main menu either command quits. After an action, press Enter to return to the menu. Signing uses a secret/private key; recipients verify with the matching public key. Encryption uses the recipient public key and decryption requires its corresponding secret key.
 
 ## Registry wording
 
