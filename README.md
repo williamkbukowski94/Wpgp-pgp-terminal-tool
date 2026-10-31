@@ -33,29 +33,29 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\install-windows.ps1
 ```
 
-The installer copies the program to `Documents\Codex\wpgp`, creates a `wpgp.cmd` launcher, and adds that folder to your user PATH when Windows permits it. Then run in a new PowerShell window:
+The installer checks for GnuPG. If it is missing, it asks before downloading the official Gpg4win installer and opening its interactive setup. It installs wpgp into `Documents\Codex\wpgp`, creates a `wpgp.cmd` launcher, configures the current-user PATH, and applies execution-policy bypass only to the wpgp child process. Open a new PowerShell window and run:
 
 ```powershell
 wpgp
 ```
 
-The installer does not need administrator rights. If your device blocks user environment changes, add `Documents\Codex\wpgp` to PATH manually or invoke the script by full path. To uninstall, remove `Documents\Codex\wpgp` and remove its path entry from your user PATH.
+The installer does not need administrator rights for wpgp itself. Gpg4win may request approval through Windows UAC. If Gpg4win installation is declined, wpgp is still installed but PGP operations remain unavailable until GnuPG is installed. To uninstall, remove `Documents\Codex\wpgp` and its user PATH entry.
 
 ### Windows menu
 
 | Option | Action |
 | --- | --- |
-| 1 | Encrypt typed text for a recipient. If automatic signing is on, sign with your selected secret key too. |
-| 2 | Decrypt a selected encrypted file. |
+| 1 | Encrypt typed or file-based text for a recipient. Choose a key from your keyring, import a key file, or paste a key. |
+| 2 | Decrypt an encrypted file or pasted armored message. The plaintext is shown in the terminal. |
 | 3 | List public and secret key metadata in your GnuPG keyring. |
 | 4 | Show the keyring and import a recipient public key from a filename search, path, or pasted armor. |
 | 5 | Generate a key pair using GnuPG's standard defaults. |
-| 6 | Toggle automatic signing; starts off each time wpgp launches. |
-| 7 | Clear-sign typed text with your secret key. |
-| 8 | Verify a signed message file. |
+| 6 | Toggle automatic signing; starts off each time wpgp launches and its state appears in the menu. |
+| 7 | Clear-sign typed or file-based text with your secret key. |
+| 8 | Verify a signed file or pasted message. |
 | 9 | Export your public key to an ASCII-armored file. |
 
-Messages are entered one line at a time; enter a single period (`.`) on a line by itself to finish. The filename search checks your user profile, Desktop, and current directory. It displays full paths so you can choose the intended match. The “keyring” is GnuPG's local key store, not the Windows Registry.
+Messages and keys can be typed/pasted or read from a file where applicable. Multi-line text entry ends with a single period (`.`) on a line by itself. Generated encrypted/signed output and decrypted plaintext are shown in the terminal; confirm with `y` or `n` that you have read it. Type `exit` or `quit` at any wpgp prompt to return to the menu; at the main menu these commands quit. Choose option 6 and press Enter to toggle automatic signing. Filename search checks your user profile, Desktop, and current directory and shows full paths. The “keyring” is GnuPG's local key store, not the Windows Registry.
 
 For more installation, security, and troubleshooting details, see [Windows installation](docs/INSTALL-WINDOWS.md).
 
@@ -71,10 +71,6 @@ The existing `wpgp` Bash program and `install.sh` remain available. They require
 - Protect and back up your secret keys. A lost secret key may make old encrypted messages unrecoverable.
 - Message text is entered in the terminal and may remain in terminal scrollback. Avoid shared or recorded sessions.
 - Decryption and key generation may invoke GnuPG's pinentry/passphrase prompt.
-
-## Windows installer
-
-The standalone console installer is available as [`wpgp-setup.exe`](https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool/blob/main/wpgp-setup.exe), with source and build instructions in [`installer/`](https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool/tree/main/installer). It downloads the current Windows PowerShell app from this public repository and adds `wpgp` to the installing user's PATH. If GnuPG is missing, setup asks before downloading and opening Gpg4win's interactive installer.
 
 ## Credits
 
