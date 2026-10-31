@@ -74,7 +74,7 @@ function Get-MessageText {
 function Save-Message([string]$Text, [string]$SuggestedName) {
     $path = Read-Host "Output file [$SuggestedName]"
     if ([string]::IsNullOrWhiteSpace($path)) { $path = Join-Path (Get-Location) $SuggestedName }
-    $Text | Set-Content -LiteralPath $path -Encoding utf8
+    [IO.File]::WriteAllText($path, $Text, [Text.UTF8Encoding]::new($false))
     Write-Host "Saved: $path" -ForegroundColor Green
 }
 function Protect-Message {
