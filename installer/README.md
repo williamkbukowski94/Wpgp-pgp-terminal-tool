@@ -1,6 +1,6 @@
 # wpgp Windows installer
 
-`wpgp-setup.exe` is a small Windows console installer. It checks for GnuPG and, if missing, asks before downloading the official Gpg4win installer and launching its interactive setup. If declined, it still installs wpgp and explains that PGP operations need GnuPG. It downloads the PowerShell app from GitHub, installs it as `wpgp-core.ps1`, creates a `wpgp.cmd` command launcher, and adds the install folder to the current user's PATH. The launcher bypasses execution policy only for its own child PowerShell process; it does not change machine policy.
+`wpgp-setup.exe` is a small Windows console installer. It checks for GnuPG and, if missing, asks before downloading the official Gpg4win installer and launching its interactive setup. If declined, it still installs wpgp and explains that PGP operations need GnuPG. It downloads the PowerShell app from GitHub, installs it as `wpgp-core.ps1` under the current user's `Documents\Codex\wpgp`, creates a `wpgp.cmd` command launcher, and configures the current-user PATH. The launcher bypasses execution policy only for its own child PowerShell process; it does not change machine policy.
 
 After setup, open Windows PowerShell and run `wpgp` from any directory. Gpg4win may request approval through Windows UAC during its interactive installation.
 
