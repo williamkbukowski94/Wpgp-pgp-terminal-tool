@@ -324,8 +324,8 @@ main_menu() {
   need_gpg || exit 1
   while :; do
     clear_page; intro_animation
-    printf '%s                    +------------------------------------------+%s\n' "$C_WHITE" "$C_RESET"
-    printf '%s                    |              W P G P                    |%s\n' "$C_WHITE" "$C_RESET"
+    printf '%s                    +------------------------------------------+       %s /\_/\\%s\n' "$C_WHITE" "$C_WHITE" "$C_RESET"
+    printf '%s                    | W P G P                                  |       %s(%so.o%s)%s\n' "$C_WHITE" "$C_WHITE" "$YELLOW" "$C_WHITE" "$C_RESET"
     printf '%s                    |       OPENPGP TERMINAL  //  v%s       |%s\n' "$C_WHITE" "$VERSION" "$C_RESET"
     printf '%s                    +------------------------------------------+%s\n\n' "$C_WHITE" "$C_RESET"
     printf '                          %sWELCOME%s\n\n' "$C_GREEN" "$C_RESET"
