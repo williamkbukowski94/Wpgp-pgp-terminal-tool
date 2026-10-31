@@ -33,13 +33,13 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\install-windows.ps1
 ```
 
-The installer copies the program to your user PowerShell scripts directory and adds a `wpgp` function to your current-user PowerShell profile. Open a new PowerShell window (or dot-source your profile) and run:
+The installer copies the program to `Documents\Codex\wpgp`, creates a `wpgp.cmd` launcher, and adds that folder to your user PATH. Run in the current or any new PowerShell window:
 
 ```powershell
 wpgp
 ```
 
-The installer does not need administrator rights. To uninstall, remove the installed `wpgp.ps1` and the `wpgp` function block from the profile shown by `$PROFILE.CurrentUserAllHosts`.
+The installer does not need administrator rights. To uninstall, remove `Documents\Codex\wpgp` and remove its path entry from your user PATH.
 
 ### Windows menu
 
