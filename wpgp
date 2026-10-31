@@ -5,9 +5,9 @@ set -uo pipefail
 IFS=$'\n\t'
 
 VERSION='0.1.0'
-GREEN=$'\033[1;92m'
+GREEN=$'\033[1;38;5;34m'
 RED=$'\033[1;91m'
-WHITE=$'\033[1;97m'
+WHITE=$'\033[1;38;5;34m'
 DIM=$'\033[2m'
 YELLOW=$'\033[1;93m'
 RESET=$'\033[0m'
@@ -288,7 +288,7 @@ intro_animation() {
     else
       printf '                       %s /\_/\\%s\n                      %s( %s-.-%s )%s\n                      %s / > ^ \\%s   %s~*%s\n' "$C_WHITE" "$C_RESET" "$C_WHITE" "$YELLOW" "$C_WHITE" "$C_RESET" "$C_WHITE" "$C_RESET" "$YELLOW" "$C_RESET"
     fi
-    printf '\n                         %swkb&co%s\n' "$C_RED" "$C_RESET"
+    printf '\n                         %swb%s\n' "$C_GREEN" "$C_RESET"
     sleep 0.2
   done
   printf '\033[2J\033[H\033[97m\n\n\n\n\n'
@@ -324,14 +324,13 @@ main_menu() {
   need_gpg || exit 1
   while :; do
     clear_page; intro_animation
-    printf '%s                    +------------------------------------------+       %s /\_/\\%s\n' "$C_WHITE" "$C_WHITE" "$C_RESET"
-    printf '%s                    | W P G P                                  |       %s(%so.o%s)%s\n' "$C_WHITE" "$C_WHITE" "$YELLOW" "$C_WHITE" "$C_RESET"
-    printf '%s                    |       OPENPGP TERMINAL  //  v%s       |%s\n' "$C_WHITE" "$VERSION" "$C_RESET"
-    printf '%s                    +------------------------------------------+%s\n\n' "$C_WHITE" "$C_RESET"
-    printf '                          %sWELCOME%s\n\n' "$C_GREEN" "$C_RESET"
-    printf '                    %sE%s  Encrypt a message\n                    %sD%s  Decrypt a message\n                    %sK%s  Display my keys\n                    %sN%s  Make a new key pair\n                    %sR%s  Add recipient public key\n                    %sQ%s  Quit\n\n' "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET"
-    printf '                              %swkb&co%s\n' "$C_RED" "$C_RESET"
-    printf 'wpgp> '
+    printf '%s                    +--------------------------------------------------+%s\n' "$C_WHITE" "$C_RESET"
+    printf '%s                    | WPGP                                      WB      |%s\n' "$C_WHITE" "$C_RESET"
+    printf '%s                    | OpenPGP terminal  /  v%-24s          |%s\n' "$C_WHITE" "$VERSION" "$C_RESET"
+    printf '%s                    +--------------------------------------------------+%s\n\n' "$C_WHITE" "$C_RESET"
+    printf '%s                    E   Encrypt message\n                    D   Decrypt message\n                    K   Display my keys\n                    N   Make a new key pair\n                    R   Add recipient key\n                    Q   Quit\n%s\n' "$C_GREEN" "$C_RESET"
+    printf '%s                    --------------------------------------------------%s\n' "$C_WHITE" "$C_RESET"
+    printf '                    wpgp › '
     IFS= read -r choice || break
     case "$choice" in
       e|E|encrypt) encrypt_flow false || pause ;;
@@ -340,7 +339,7 @@ main_menu() {
       n|N|new) new_key_flow || pause ;;
       r|R|recipient|recipients) add_recipient || pause ;;
       q|Q|quit|exit) break ;;
-      *) err 'Choose E, D, K, N, or Q.'; pause ;;
+      *) err 'Choose E, D, K, N, R, or Q.'; pause ;;
     esac
   done
   clear_page
