@@ -47,7 +47,12 @@ function Show-Loading {
     Start-Sleep -Milliseconds 1000
 }
 
-function Pause-Menu { Write-Host ''; [void](Read-Host 'Press Enter to return to the menu') }
+function Read-Wpgp([string]$Prompt = '') {
+    if ($Prompt) { Write-Host $Prompt }
+    Write-Host '% ' -NoNewline -ForegroundColor DarkCyan
+    return [Console]::ReadLine()
+}
+function Pause-Menu { Write-Host ''; [void](Read-Wpgp 'Press Enter to return to the menu') }
 function Require-Gpg {
     if (-not $script:Gpg) { throw 'GnuPG was not found. Install Gpg4win (gpg) and make sure gpg.exe is on PATH.' }
 }
@@ -57,7 +62,7 @@ function Invoke-Gpg([string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "GnuPG returned exit code $LASTEXITCODE." }
 }
 function Get-KeyId([string]$Prompt) {
-    $id = Read-Host $Prompt
+    $id = Read-Wpgp $Prompt
     if ([string]::IsNullOrWhiteSpace($id)) { throw 'A key ID, fingerprint, or email address is required.' }
     return $id
 }
@@ -65,14 +70,14 @@ function Get-MessageText {
     Write-Host 'Enter the message. Finish with a line containing only .'
     $lines = [System.Collections.Generic.List[string]]::new()
     while ($true) {
-        $line = Read-Host
+        $line = Read-Wpgp
         if ($line -eq '.') { break }
         $lines.Add($line)
     }
     return ($lines -join [Environment]::NewLine)
 }
 function Save-Message([string]$Text, [string]$SuggestedName) {
-    $path = Read-Host "Output file [$SuggestedName]"
+    $path = Read-Wpgp "Output file [$SuggestedName]"
     if ([string]::IsNullOrWhiteSpace($path)) { $path = Join-Path (Get-Location) $SuggestedName }
     [IO.File]::WriteAllText($path, $Text, [Text.UTF8Encoding]::new($false))
     Write-Host "Saved: $path" -ForegroundColor Green
@@ -95,7 +100,7 @@ function Protect-Message {
     } finally { Remove-Item $inputFile, $outputFile -Force -ErrorAction SilentlyContinue }
 }
 function Unprotect-Message {
-    $path = Read-Host 'Encrypted .asc/.pgp file path'
+    $path = Read-Wpgp 'Encrypted .asc/.pgp file path'
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Input file not found.' }
     $outputFile = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString() + '.txt')
     try {
@@ -110,8 +115,8 @@ function Show-Keys {
     Invoke-Gpg @('--list-secret-keys', '--keyid-format', 'long')
 }
 function New-KeyPair {
-    $name = Read-Host 'Name for the key'
-    $email = Read-Host 'Email address'
+    $name = Read-Wpgp 'Name for the key'
+    $email = Read-Wpgp 'Email address'
     if (-not $name -or -not $email) { throw 'Name and email are required.' }
     $uid = "$name <$email>"
     Invoke-Gpg @('--quick-generate-key', $uid, 'default', 'default')
@@ -126,7 +131,7 @@ function Export-PublicKey {
     } finally { Remove-Item $out -Force -ErrorAction SilentlyContinue }
 }
 function Find-KeyFile {
-    $name = Read-Host 'Key filename to search for (for example recipient.asc)'
+    $name = Read-Wpgp 'Key filename to search for (for example recipient.asc)'
     if (-not $name) { throw 'Enter a filename.' }
     $roots = @([Environment]::GetFolderPath('UserProfile'), [Environment]::GetFolderPath('Desktop'), (Get-Location).Path) | Select-Object -Unique
     $matches = foreach ($root in $roots) {
@@ -137,7 +142,7 @@ function Find-KeyFile {
     $matches = @($matches | Sort-Object FullName -Unique)
     if (-not $matches.Count) { throw "No file named '$name' found in your profile, Desktop, or current directory." }
     for ($i = 0; $i -lt $matches.Count; $i++) { Write-Host "[$($i + 1)] $($matches[$i].FullName)" }
-    $choice = Read-Host 'Choose a file number'
+    $choice = Read-Wpgp 'Choose a file number'
     $index = 0
     if (-not [int]::TryParse($choice, [ref]$index) -or $index -lt 1 -or $index -gt $matches.Count) { throw 'Invalid file selection.' }
     return $matches[$index - 1].FullName
@@ -148,13 +153,13 @@ function Import-KeyFile([string]$Path) {
 }
 function Add-Key {
     Write-Host '[1] Find a key text file by filename  [2] Enter file path  [3] Paste key text'
-    switch (Read-Host 'Choose source') {
+    switch (Read-Wpgp 'Choose source') {
         '1' { $path = Find-KeyFile; Import-KeyFile $path }
-        '2' { $path = Read-Host 'Key file path'; Import-KeyFile $path }
+        '2' { $path = Read-Wpgp 'Key file path'; Import-KeyFile $path }
         '3' {
             Write-Host 'Paste the complete ASCII-armored key; finish with a line containing only .'
             $lines = [System.Collections.Generic.List[string]]::new()
-            while (($line = Read-Host) -ne '.') { $lines.Add($line) }
+            while (($line = Read-Wpgp) -ne '.') { $lines.Add($line) }
             $temp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString() + '.asc')
             try { [IO.File]::WriteAllLines($temp, $lines); Import-KeyFile $temp } finally { Remove-Item $temp -Force -ErrorAction SilentlyContinue }
         }
@@ -173,7 +178,7 @@ function Sign-Message {
     } finally { Remove-Item $in, $out -Force -ErrorAction SilentlyContinue }
 }
 function Verify-Message {
-    $path = Read-Host 'Signed message file path'
+    $path = Read-Wpgp 'Signed message file path'
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Input file not found.' }
     Invoke-Gpg @('--verify', $path)
 }
@@ -205,7 +210,7 @@ function Show-Menu {
         Write-Host '[0] Exit'
         Write-Host "`nGnuPG: $(if ($script:Gpg) { 'available' } else { 'not found' }) | Automatic signing is off by default."
         Write-Host 'written by WB for all open source use' -ForegroundColor DarkCyan
-        switch (Read-Host "`nSelect an option") {
+        switch (Read-Wpgp "`nSelect an option") {
             '1' { Run-Action { Protect-Message } }
             '2' { Run-Action { Unprotect-Message } }
             '3' { Run-Action { Show-Keys } }
@@ -223,4 +228,5 @@ function Show-Menu {
 
 Show-Loading
 Show-Menu
+
 
