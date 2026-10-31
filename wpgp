@@ -9,8 +9,10 @@ GREEN=$'\033[1;92m'
 RED=$'\033[1;91m'
 WHITE=$'\033[1;97m'
 DIM=$'\033[2m'
+YELLOW=$'\033[1;93m'
 RESET=$'\033[0m'
 TMP_ROOT=''
+CONTACTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/wpgp/recipients.tsv"
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_GREEN=$GREEN C_RED=$RED C_WHITE=$WHITE C_DIM=$DIM C_RESET=$RESET
@@ -53,7 +55,7 @@ banner() {
   printf '%s+--------------------------------------------------------------+%s\n' "$C_WHITE" "$C_RESET"
 }
 
-ok() { printf '%s[✓] %s%s\n' "$C_GREEN" "$*" "$C_RESET"; }
+ok() { printf '%s[✓] Completed!%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
 err() { printf '%s[!] %s%s\n' "$C_RED" "$*" "$C_RESET" >&2; }
 
 editor_file() {
@@ -134,17 +136,53 @@ choose_input() {
   done
 }
 
-choose_key() {
-  local keyfile=$1 fingerprint
+recipient_records() {
+  gpg --batch --with-colons --fingerprint --list-keys 2>/dev/null | awk -F: '
+    $1 == "pub" { keyid=$5; name=""; next }
+    $1 == "uid" && name == "" { name=$10; next }
+    $1 == "fpr" && keyid != "" { print keyid "|" name "|" $10; keyid=""; name="" }
+  '
+}
+
+choose_recipient() {
+  local keyid name fingerprint choice
+  local -a ids=() names=() fprs=()
+  while IFS='|' read -r keyid name fingerprint; do
+    [[ -n "$fingerprint" ]] || continue
+    ids+=("$keyid"); names+=("${name:-Unlabeled key}"); fprs+=("$fingerprint")
+  done < <(recipient_records)
+  ((${#fprs[@]})) || { err 'No public keys in the GnuPG keyring. Use R to add a recipient.'; return 1; }
+  printf '\n%sRECIPIENT IDENTITIES%s\n' "$C_GREEN" "$C_RESET"
+  for i in "${!fprs[@]}"; do
+    local saved_label=''
+    [[ -f "$CONTACTS_FILE" ]] && saved_label=$(awk -F '\t' -v f="${fprs[$i]}" '$1==f {print $2; exit}' "$CONTACTS_FILE")
+    printf '  %d) %s%s%s  [key %s]\n' "$((i+1))" "$saved_label" "${saved_label:+ — }" "${names[$i]}" "${ids[$i]}"
+  done
+  printf 'Select a number: '
+  IFS= read -r choice || return 1
+  [[ "$choice" =~ ^[0-9]+$ ]] && ((choice>0 && choice<=${#fprs[@]})) || { err 'Invalid selection.'; return 1; }
+  WPGP_RECIPIENT=${fprs[$((choice-1))]}; WPGP_RECIPIENT_NAME=${names[$((choice-1))]}
+}
+
+add_recipient() {
+  local keyfile keyid name fingerprint choice label
+  local -a ids=() names=() fprs=()
   init_tmp || return 1
-  printf '\nImporting the selected public key into your GnuPG keyring.\n'
-  if ! gpg --batch --import "$keyfile"; then err 'GnuPG could not import that public key.'; return 1; fi
-  printf '\n%sAvailable recipient keys:%s\n' "$C_GREEN" "$C_RESET"
-  gpg --list-keys --keyid-format long
-  printf '\nEnter the recipient key fingerprint, key ID, or email: '
-  IFS= read -r fingerprint || return 1
-  [[ -n "$fingerprint" ]] || { err 'A recipient is required.'; return 1; }
-  WPGP_RECIPIENT=$fingerprint
+  choose_input 'Recipient public key' || return 1; keyfile=$REPLY
+  gpg --batch --import "$keyfile" || { err 'Could not import public key.'; return 1; }
+  while IFS='|' read -r keyid name fingerprint; do
+    [[ -n "$fingerprint" ]] || continue
+    ids+=("$keyid"); names+=("${name:-Unlabeled key}"); fprs+=("$fingerprint")
+  done < <(recipient_records)
+  for i in "${!fprs[@]}"; do printf '  %d) %s [%s]\n' "$((i+1))" "${names[$i]}" "${ids[$i]}"; done
+  printf 'Select imported identity number: '; IFS= read -r choice || return 1
+  [[ "$choice" =~ ^[0-9]+$ ]] && ((choice>0 && choice<=${#fprs[@]})) || { err 'Invalid selection.'; return 1; }
+  printf 'Associated name / information: '; IFS= read -r label || return 1
+  mkdir -p "${CONTACTS_FILE%/*}" && chmod 700 "${CONTACTS_FILE%/*}"
+  touch "$CONTACTS_FILE" && chmod 600 "$CONTACTS_FILE"
+  label=${label:-${names[$((choice-1))]}}
+  printf '%s\t%s\n' "${fprs[$((choice-1))]}" "$label" >> "$CONTACTS_FILE"
+  ok 'Recipient saved.'
 }
 
 encrypt_flow() {
@@ -155,19 +193,18 @@ encrypt_flow() {
     msgfile="$TMP_ROOT/message.txt"
     editor_file 'recipient public key' "$keyfile" || return 1
     ok 'Public key captured.'
+    gpg --batch --import "$keyfile" || { err 'Could not import public key.'; return 1; }
     editor_file 'message' "$msgfile" || return 1
     ok 'Message captured.'
   else
-    choose_input 'Recipient public key' || return 1; keyfile=$REPLY
-    ok 'Public key selected.'
     choose_input 'Message' || return 1; msgfile=$REPLY
     ok 'Message selected.'
   fi
-  choose_key "$keyfile" || return 1
+  choose_recipient || return 1
   printf '\nSign this message with one of your private keys? [y/N] '
   IFS= read -r answer || return 1
   case "$answer" in y|Y) signopt='--sign' ;; esac
-  printf '\nEncrypt for %s? [y/N] ' "$WPGP_RECIPIENT"
+  printf '\nEncrypt for %s? [y/N] ' "$WPGP_RECIPIENT_NAME"
   IFS= read -r answer || return 1
   [[ "$answer" == y || "$answer" == Y ]] || { err 'Encryption cancelled.'; return 1; }
   output="$TMP_ROOT/message.asc"
@@ -241,6 +278,22 @@ keys_screen() {
   done
 }
 
+intro_animation() {
+  [[ -t 1 ]] || return 0
+  for frame in 1 2 3 4 5 6; do
+    printf '\033[2J\033[H\n\n\n\n'
+    printf '                    %sO P E N P G P%s\n\n' "$C_WHITE" "$C_RESET"
+    if ((frame % 2)); then
+      printf '                       %s /\_/\\%s\n                      %s( %so.o%s )%s\n                      %s / > ^ \\%s   %s~*%s\n' "$C_WHITE" "$C_RESET" "$C_WHITE" "$YELLOW" "$C_WHITE" "$C_RESET" "$C_WHITE" "$C_RESET" "$YELLOW" "$C_RESET"
+    else
+      printf '                       %s /\_/\\%s\n                      %s( %s-.-%s )%s\n                      %s / > ^ \\%s   %s~*%s\n' "$C_WHITE" "$C_RESET" "$C_WHITE" "$YELLOW" "$C_WHITE" "$C_RESET" "$C_WHITE" "$C_RESET" "$YELLOW" "$C_RESET"
+    fi
+    printf '\n                         %swkb&co%s\n' "$C_RED" "$C_RESET"
+    sleep 0.2
+  done
+  printf '\033[2J\033[H\033[97m\n\n\n\n\n'
+}
+
 new_key_flow() {
   local answer uid email comment params
   init_tmp || return 1
@@ -270,9 +323,14 @@ new_key_flow() {
 main_menu() {
   need_gpg || exit 1
   while :; do
-    clear_page; banner
-    printf '\n%sWELCOME TO WPGP%s  %s v%s%s\n\n' "$C_GREEN" "$C_RESET" "$C_DIM" "$VERSION" "$C_RESET"
-    printf '  %sE%s  Encrypt a message\n  %sD%s  Decrypt a message\n  %sK%s  Display my keys\n  %sN%s  Make a new key pair\n  %sQ%s  Quit\n\n' "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET"
+    clear_page; intro_animation
+    printf '%s                    +------------------------------------------+%s\n' "$C_WHITE" "$C_RESET"
+    printf '%s                    |              W P G P                    |%s\n' "$C_WHITE" "$C_RESET"
+    printf '%s                    |       OPENPGP TERMINAL  //  v%s       |%s\n' "$C_WHITE" "$VERSION" "$C_RESET"
+    printf '%s                    +------------------------------------------+%s\n\n' "$C_WHITE" "$C_RESET"
+    printf '                          %sWELCOME%s\n\n' "$C_GREEN" "$C_RESET"
+    printf '                    %sE%s  Encrypt a message\n                    %sD%s  Decrypt a message\n                    %sK%s  Display my keys\n                    %sN%s  Make a new key pair\n                    %sR%s  Add recipient public key\n                    %sQ%s  Quit\n\n' "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_GREEN" "$C_RESET"
+    printf '                              %swkb&co%s\n' "$C_RED" "$C_RESET"
     printf 'wpgp> '
     IFS= read -r choice || break
     case "$choice" in
@@ -280,6 +338,7 @@ main_menu() {
       d|D|decrypt) decrypt_flow false || pause ;;
       k|K|keys) keys_screen ;;
       n|N|new) new_key_flow || pause ;;
+      r|R|recipient|recipients) add_recipient || pause ;;
       q|Q|quit|exit) break ;;
       *) err 'Choose E, D, K, N, or Q.'; pause ;;
     esac

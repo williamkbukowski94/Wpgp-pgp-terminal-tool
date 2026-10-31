@@ -10,11 +10,10 @@ Wpgp is a Bash front end for GnuPG. GnuPG performs all OpenPGP key, encryption, 
 
 ## Install for your user
 
-From the folder containing this script, run:
+Clone and install in one command (private repository access is required):
 
 ```bash
-mkdir -p "$HOME/.local/bin"
-install -m 700 wpgp "$HOME/.local/bin/wpgp"
+git clone https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool.git && cd Wpgp-pgp-terminal-tool && ./install.sh
 ```
 
 If `~/.local/bin` is not already on your `PATH`, add this line to `~/.bashrc`, then open a new terminal:
@@ -33,6 +32,7 @@ Run `wpgp`. Do not use `sudo`: Wpgp should use your account's GnuPG keyring and 
 - `wpgp decrypt` starts decryption with filename selection.
 - `wpgp decrypt --manual` opens the editor for the encrypted message.
 - `wpgp --help` shows command usage.
+- `R` in the main menu imports a recipient public key and saves a contact label.
 
 Filename lookup searches recursively under your home folder. To restrict searches to particular folders, set `WPGP_SEARCH_DIRS` to a colon-separated list before starting Wpgp. For example:
 
@@ -44,7 +44,7 @@ When there are duplicate filenames, Wpgp displays the matching paths and asks yo
 
 ## Key and signature behavior
 
-- **Encrypt** imports the selected recipient public key into your GnuPG keyring, asks which recipient identity to use, and offers optional signing with one of your private keys.
+- **Encrypt** displays public-key identities in a numbered list; select one by number. Press `R` at the menu to import a recipient key and associate a contact label. Imported keys are kept in your GnuPG keyring; labels are stored under `~/.config/wpgp/recipients.tsv`.
 - **Decrypt** uses your regular GnuPG keyring. GnuPG reports signature status and signer identity when the message is signed. Verify the signer's full fingerprint independently before trusting that identity.
 - **Display my keys** lists public keys and secret-key metadata. It does not print private key material.
 - **Make a new key pair** adds a new pair and preserves existing keys. Existing private keys may be needed to decrypt old messages; back them up securely before removing them through GnuPG.
@@ -54,3 +54,5 @@ GnuPG may open its own passphrase prompt during signing, decryption, or key gene
 ## Appearance
 
 Wpgp uses ANSI green, red, and white styling in interactive terminals. The terminal controls its background color; set the terminal background to black for the intended look. Set `NO_COLOR=1` to disable styling.
+
+The short opening animation shows a yellow-eyed tuxedo cat blinking beside a butterfly. Success messages use a green checkmark and “Completed!”; the menu credits `wkb&co`.
