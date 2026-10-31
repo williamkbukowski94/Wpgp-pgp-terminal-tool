@@ -25,7 +25,7 @@ internal static class WpgpInstaller
 
     private static string InstallDirectory()
     {
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Codex", "wpgp");
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Codex", "wpgp");
     }
 
     private static string FindGpg()
@@ -119,14 +119,27 @@ internal static class WpgpInstaller
         {
             if (key == null) throw new InvalidOperationException("Could not open the current-user environment settings.");
             string current = (key.GetValue("Path", "", RegistryValueOptions.DoNotExpandEnvironmentNames) ?? "").ToString();
+            string legacyDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Codex", "wpgp");
+            string[] entries = current.Split(';');
+            System.Collections.Generic.List<string> updatedEntries = new System.Collections.Generic.List<string>();
             bool found = false;
-            foreach (string entry in current.Split(';'))
-                if (String.Equals(entry.TrimEnd('\\'), directory.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) found = true;
-            if (!found)
+            foreach (string entry in entries)
             {
-                string updated = String.IsNullOrWhiteSpace(current) ? directory : current.TrimEnd(';') + ";" + directory;
-                key.SetValue("Path", updated, RegistryValueKind.ExpandString);
+                if (String.Equals(entry.TrimEnd('\\'), directory.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!found) updatedEntries.Add(directory);
+                    found = true;
+                    continue;
+                }
+                if (!String.Equals(legacyDirectory.TrimEnd('\\'), directory.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
+                    String.Equals(entry.TrimEnd('\\'), legacyDirectory.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!String.IsNullOrWhiteSpace(entry)) updatedEntries.Add(entry);
             }
+            if (!found) updatedEntries.Add(directory);
+            string updated = String.Join(";", updatedEntries.ToArray());
+            if (!String.Equals(updated, current, StringComparison.OrdinalIgnoreCase))
+                key.SetValue("Path", updated, RegistryValueKind.ExpandString);
         }
         return gpgReady;
     }
