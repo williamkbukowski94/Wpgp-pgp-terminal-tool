@@ -55,4 +55,4 @@ GnuPG may open its own passphrase prompt during signing, decryption, or key gene
 
 Wpgp uses ANSI green, red, and white styling in interactive terminals. The terminal controls its background color; set the terminal background to black for the intended look. Set `NO_COLOR=1` to disable styling.
 
-The short opening animation shows a yellow-eyed tuxedo cat blinking beside a butterfly. The compact menu uses aligned green rules and text with a `WB` monogram. Success messages use a green checkmark and “Completed!”; the author credit is `wb`.
+The short opening animation shows a yellow-eyed tuxedo cat blinking beside a butterfly. Screens use a heavy double-line frame and the bold title “WPGP - Cryptographic Tool” on a black terminal background. Success messages use a green checkmark and “Completed!”; the author credit is `wb`.
