@@ -33,6 +33,7 @@ Run `wpgp`. Do not use `sudo`: Wpgp should use your account's GnuPG keyring and 
 - `wpgp decrypt --manual` opens the editor for the encrypted message.
 - `wpgp --help` shows command usage.
 - `R` in the main menu imports a recipient public key and saves a contact label.
+- Type `menu` and press Enter at any Wpgp text prompt to cancel the current action and return to the main menu.
 
 Filename lookup searches recursively under your home folder. To restrict searches to particular folders, set `WPGP_SEARCH_DIRS` to a colon-separated list before starting Wpgp. For example:
 

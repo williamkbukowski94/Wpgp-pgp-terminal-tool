@@ -14,6 +14,7 @@ YELLOW=$'\033[1;93m'
 RESET=$'\033[0m'
 TMP_ROOT=''
 CONTACTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/wpgp/recipients.tsv"
+MENU_REQUESTED=0
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_GREEN=$GREEN C_RED=$RED C_WHITE=$WHITE C_DIM=$DIM C_RESET=$RESET
@@ -25,6 +26,17 @@ cleanup() {
   [[ -n "$TMP_ROOT" && -d "$TMP_ROOT" ]] && rm -rf -- "$TMP_ROOT"
 }
 trap cleanup EXIT HUP INT TERM
+
+# Type `menu` at any Wpgp text prompt to cancel the current flow and return.
+read() {
+  local target="${@: -1}"
+  builtin read "$@" || return $?
+  if [[ -n "$target" && ( "${!target:-}" == menu || "${!target:-}" == :menu ) ]]; then
+    printf -v "$target" ''
+    MENU_REQUESTED=1
+    return 2
+  fi
+}
 
 need_gpg() {
   if ! command -v gpg >/dev/null 2>&1; then
@@ -46,6 +58,7 @@ clear_page() {
 }
 
 pause() {
+  [[ "$MENU_REQUESTED" == 1 ]] && return 0
   printf '\n%sPress Enter to continue…%s' "$C_DIM" "$C_RESET"
   IFS= read -r _ || true
 }
@@ -334,7 +347,11 @@ main_menu() {
     printf '%s                    E   Encrypt message\n                    D   Decrypt message\n                    K   Display my keys\n                    N   Make a new key pair\n                    R   Add recipient key\n                    Q   Quit\n%s\n' "$C_GREEN" "$C_RESET"
     printf '%s╚══════════════════════════════════════════════════════════════╝%s\n' "$C_WHITE" "$C_RESET"
     printf '                    wpgp › '
-    IFS= read -r choice || break
+    if ! IFS= read -r choice; then
+      if [[ "$MENU_REQUESTED" == 1 ]]; then MENU_REQUESTED=0; continue; fi
+      break
+    fi
+    MENU_REQUESTED=0
     case "$choice" in
       e|E|encrypt) encrypt_flow false || pause ;;
       d|D|decrypt) decrypt_flow false || pause ;;
