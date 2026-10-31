@@ -34,10 +34,10 @@ The launcher invokes Windows PowerShell with a process-only execution-policy byp
 ## Use
 
 - **Encrypt**: choose an existing recipient key, import one from a file, or paste an ASCII-armored public key. Enter a key email, ID, or fingerprint, then type a message or read it from a file. A line containing only `.` ends typed input. With auto-sign enabled, select your secret key when prompted. The armored result is saved and displayed for review.
-- **Decrypt**: choose an encrypted file or paste an ASCII-armored message. GnuPG uses your secret key and may prompt for its passphrase. The plaintext appears in the terminal; confirm with `y` or `n` that you have read it.
+- **Decrypt**: choose an encrypted file or paste an ASCII-armored message. GnuPG uses your secret key and may prompt for its passphrase. The plaintext appears in the terminal, saves by default to `Documents\Codex\wpgp\messages\decrypted-message.txt`, and asks you to confirm with `y` or `n` that you have read it.
 - **Key pairs**: display public and secret key listings, or create a key pair. Key generation uses GnuPG defaults and may open pinentry.
 - **Import public key**: choose filename search, direct path, or paste ASCII-armored key text. Imported keys enter your normal GnuPG keyring. The filename search checks the user profile, Desktop, and current directory recursively and shows matching paths.
-- **Sign**: create a clear-signed message from typed text or a file using your secret key. The result is saved and shown for review.
+- **Sign**: create a clear-signed message from typed text or a file using your secret key. The result saves by default to `Documents\Codex\wpgp\messages\signed-message.asc` and is shown for review.
 - **Verify**: check a signed file or pasted message. Treat a valid signature as proof that the matching private key signed the data; independently verify the signer fingerprint to associate it with a person.
 - **Export**: save an ASCII-armored copy of your public key to share.
 
