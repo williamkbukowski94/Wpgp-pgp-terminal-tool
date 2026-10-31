@@ -7,35 +7,29 @@ if (-not (Test-Path -LiteralPath $sourceScript -PathType Leaf)) {
     throw "Cannot find windows\wpgp.ps1 beside this installer. Run it from the repository checkout."
 }
 
-$installDirectory = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Scripts'
+$installDirectory = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Documents\Codex\wpgp'
 $installedScript = Join-Path $installDirectory 'wpgp.ps1'
-$profilePath = $PROFILE.CurrentUserAllHosts
-$beginMarker = '# >>> wpgp launcher >>>'
-$endMarker = '# <<< wpgp launcher <<<'
-$launcher = @"
-$beginMarker
-function wpgp {
-    & '$($installedScript.Replace("'", "''"))' @args
-}
-$endMarker
-"@
+$launcherPath = Join-Path $installDirectory 'wpgp.cmd'
+$engine = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+if (-not $engine) { $engine = Get-Command powershell.exe -ErrorAction SilentlyContinue }
+if (-not $engine) { throw 'Neither pwsh.exe nor powershell.exe was found.' }
 
 New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
 Copy-Item -LiteralPath $sourceScript -Destination $installedScript -Force
+[IO.File]::WriteAllText($launcherPath, "@echo off`r`n`"$($engine.Source)`" -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0wpgp.ps1`" %*`r`n", [Text.Encoding]::ASCII)
 
-$profileDirectory = Split-Path -Parent $profilePath
-New-Item -ItemType Directory -Path $profileDirectory -Force | Out-Null
-$profileText = if (Test-Path -LiteralPath $profilePath) { Get-Content -LiteralPath $profilePath -Raw } else { '' }
-$escapedBegin = [regex]::Escape($beginMarker)
-$escapedEnd = [regex]::Escape($endMarker)
-$blockPattern = "(?ms)^$escapedBegin\r?\n.*?^$escapedEnd(?:\r?\n)?"
-if ($profileText -match $blockPattern) {
-    $profileText = [regex]::Replace($profileText, $blockPattern, '')
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+$pathEntries = @($userPath -split ';' | Where-Object { $_ })
+if (-not ($pathEntries | Where-Object { $_.TrimEnd('\') -ieq $installDirectory.TrimEnd('\') })) {
+    $pathEntries += $installDirectory
+    [Environment]::SetEnvironmentVariable('Path', ($pathEntries -join ';'), 'User')
 }
-$profileText = $profileText.TrimEnd() + [Environment]::NewLine + $launcher + [Environment]::NewLine
-Set-Content -LiteralPath $profilePath -Value $profileText -Encoding utf8
+$processEntries = @($env:Path -split ';' | Where-Object { $_ })
+if (-not ($processEntries | Where-Object { $_.TrimEnd('\') -ieq $installDirectory.TrimEnd('\') })) {
+    $env:Path = ($processEntries + $installDirectory) -join ';'
+}
 
 Write-Host "Installed wpgp to $installedScript" -ForegroundColor Green
-Write-Host "Added the wpgp launcher to $profilePath" -ForegroundColor Green
-Write-Host 'Open a new PowerShell window and run: wpgp' -ForegroundColor Cyan
+Write-Host "Added $installDirectory to your user PATH" -ForegroundColor Green
+Write-Host 'Run wpgp in this window or any new PowerShell window.' -ForegroundColor Cyan
 
