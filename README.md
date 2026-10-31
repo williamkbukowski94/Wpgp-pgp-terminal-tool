@@ -1,59 +1,78 @@
-# Wpgp
+# wpgp
 
-Wpgp is a Bash front end for GnuPG. GnuPG performs all OpenPGP key, encryption, signature, and decryption operations; Wpgp provides an interactive terminal flow.
+**wpgp** is a small terminal interface for GnuPG (GPG), built for people who know OpenPGP and want common tasks without memorizing command options. The repository contains the original Bash program for Linux and a Windows PowerShell version.
 
-## Requirements
+GnuPG performs all cryptographic operations. wpgp does not implement encryption itself and does not transmit messages or keys.
 
-- Bash 4 or newer
-- GnuPG (`gpg`)
-- `nano` (or set `EDITOR`/`VISUAL` to another terminal editor) for paste/type mode
+## Features
 
-## Install for your user
+- Encrypt text to a recipient's imported public key; optionally sign while encrypting.
+- Decrypt messages with a matching secret key.
+- Generate and list public and secret keys.
+- Import a public key from a file path, filename search, or pasted ASCII-armored text; export your public key.
+- Create a clear-signed message and verify a signed message.
+- Toggle automatic signing (off by default).
 
-Clone and install in one command (private repository access is required):
+Signing requires your **secret/private key**. Recipients verify with your public key. Encryption uses the recipient's public key; decryption uses your matching secret key. Never share a secret key or passphrase.
 
-```bash
-git clone https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool.git && cd Wpgp-pgp-terminal-tool && ./install.sh
+## Windows PowerShell
+
+### Requirements
+
+- Windows PowerShell 5.1 or PowerShell 7+
+- GnuPG, available as `gpg.exe` on `PATH` (Gpg4win provides GnuPG)
+
+### Install
+
+Clone this repository, then run the installer from a PowerShell window:
+
+```powershell
+git clone https://github.com/williamkbukowski94/Wpgp-pgp-terminal-tool.git
+cd Wpgp-pgp-terminal-tool
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\install-windows.ps1
 ```
 
-If `~/.local/bin` is not already on your `PATH`, add this line to `~/.bashrc`, then open a new terminal:
+The installer copies the program to your user PowerShell scripts directory and adds a `wpgp` function to your current-user PowerShell profile. Open a new PowerShell window (or dot-source your profile) and run:
 
-```bash
-export PATH="$HOME/.local/bin:$PATH"
+```powershell
+wpgp
 ```
 
-Run `wpgp`. Do not use `sudo`: Wpgp should use your account's GnuPG keyring and agent.
+The installer does not need administrator rights. To uninstall, remove the installed `wpgp.ps1` and the `wpgp` function block from the profile shown by `$PROFILE.CurrentUserAllHosts`.
 
-## Use
+### Windows menu
 
-- `wpgp` opens the menu.
-- `wpgp encrypt` starts encryption with filename selection.
-- `wpgp encrypt --manual` opens the editor for the public key and message.
-- `wpgp decrypt` starts decryption with filename selection.
-- `wpgp decrypt --manual` opens the editor for the encrypted message.
-- `wpgp --help` shows command usage.
-- `R` in the main menu imports a recipient public key and saves a contact label.
-- Type `menu` and press Enter at any Wpgp text prompt to cancel the current action and return to the main menu.
+| Option | Action |
+| --- | --- |
+| 1 | Encrypt typed text for a recipient. If automatic signing is on, sign with your selected secret key too. |
+| 2 | Decrypt a selected encrypted file. |
+| 3 | List public and secret key metadata in your GnuPG keyring. |
+| 4 | Show the keyring and import a recipient public key from a filename search, path, or pasted armor. |
+| 5 | Generate a key pair using GnuPG's standard defaults. |
+| 6 | Toggle automatic signing; starts off each time wpgp launches. |
+| 7 | Clear-sign typed text with your secret key. |
+| 8 | Verify a signed message file. |
+| 9 | Export your public key to an ASCII-armored file. |
 
-Filename lookup searches recursively under your home folder. To restrict searches to particular folders, set `WPGP_SEARCH_DIRS` to a colon-separated list before starting Wpgp. For example:
+Messages are entered one line at a time; enter a single period (`.`) on a line by itself to finish. The filename search checks your user profile, Desktop, and current directory. It displays full paths so you can choose the intended match. The “keyring” is GnuPG's local key store, not the Windows Registry.
 
-```bash
-WPGP_SEARCH_DIRS="$HOME/Documents/keys:$HOME/Documents/messages" wpgp
-```
+For more installation, security, and troubleshooting details, see [Windows installation](docs/INSTALL-WINDOWS.md).
 
-When there are duplicate filenames, Wpgp displays the matching paths and asks you to choose. Key files may be ASCII-armored `.asc` files or text files containing an ASCII-armored public key; no conversion is needed. A key that Wpgp imports is added to your regular GnuPG keyring.
+## Linux / Bash
 
-## Key and signature behavior
+The existing `wpgp` Bash program and `install.sh` remain available. They require Bash 4+, GnuPG, and a terminal editor (`nano` by default). See the original [Linux usage and installation notes](docs/LINUX.md).
 
-- **Encrypt** displays public-key identities in a numbered list; select one by number. Press `R` at the menu to import a recipient key and associate a contact label. Imported keys are kept in your GnuPG keyring; labels are stored under `~/.config/wpgp/recipients.tsv`.
-- **Decrypt** uses your regular GnuPG keyring. GnuPG reports signature status and signer identity when the message is signed. Verify the signer's full fingerprint independently before trusting that identity.
-- **Display my keys** lists public keys and secret-key metadata. It does not print private key material.
-- **Make a new key pair** adds a new pair and preserves existing keys. Existing private keys may be needed to decrypt old messages; back them up securely before removing them through GnuPG.
+## Security notes
 
-GnuPG may open its own passphrase prompt during signing, decryption, or key generation. Keep your private key protected by a strong passphrase. Wpgp uses permission-restricted temporary files and removes them when it exits, but terminal scrollback can retain displayed message contents. Saved output files are created with owner-only permissions and are not overwritten when the chosen filename already exists.
+- GnuPG owns the key store, key generation, encryption, signing, verification, and decryption.
+- Verify a public key's full fingerprint with its owner through a separate trusted channel before relying on it.
+- wpgp does not establish key trust or certify identities for you.
+- Protect and back up your secret keys. A lost secret key may make old encrypted messages unrecoverable.
+- Message text is entered in the terminal and may remain in terminal scrollback. Avoid shared or recorded sessions.
+- Decryption and key generation may invoke GnuPG's pinentry/passphrase prompt.
 
-## Appearance
+## Credits
 
-Wpgp uses ANSI green, red, and white styling in interactive terminals. The terminal controls its background color; set the terminal background to black for the intended look. Set `NO_COLOR=1` to disable styling.
+Written by WB for all open source use.
 
-The short opening animation shows a yellow-eyed tuxedo cat blinking beside a butterfly. Screens use a heavy double-line frame and the bold title “WPGP - Cryptographic Tool” on a black terminal background. Success messages use a green checkmark and “Completed!”; the author credit is `wb`.
