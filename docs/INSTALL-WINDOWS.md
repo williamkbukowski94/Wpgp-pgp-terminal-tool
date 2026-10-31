@@ -23,12 +23,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\install-windows.ps1
 ```
 
-The process-scoped execution policy change lasts only for that PowerShell window. The installer needs no elevation. It copies `windows\wpgp.ps1` to your Documents PowerShell scripts folder and adds a marked `wpgp` function to `$PROFILE.CurrentUserAllHosts`. Open a new PowerShell window to use `wpgp`, or load the profile in the current window with:
-
-```powershell
-. $PROFILE.CurrentUserAllHosts
-wpgp
-```
+The process-scoped execution policy change lasts only for that PowerShell window. The installer needs no elevation. It copies `windows\wpgp.ps1` to `Documents\Codex\wpgp`, creates a command launcher, and adds the folder to your per-user `PATH`. Run `wpgp` in the current window or any new PowerShell window.
 
 The launcher invokes the script directly. GnuPG stores its keys in your account's normal GnuPG home directory; wpgp does not make another key store.
 
@@ -50,13 +45,13 @@ The app lists and imports keys in GnuPG's keyring. It does not inspect or edit t
 
 ## Uninstall
 
-Remove `wpgp.ps1` from the PowerShell scripts folder shown during install and remove the section between `# >>> wpgp launcher >>>` and `# <<< wpgp launcher <<<` from `$PROFILE.CurrentUserAllHosts`. This does not remove any GnuPG keys or messages.
+Remove the `Documents\Codex\wpgp` folder and remove that folder from your user `PATH`. This does not remove any GnuPG keys or messages.
 
 ## Troubleshooting
 
 - **`gpg.exe` not found**: install Gpg4win, add its GnuPG `bin` folder to `PATH`, and restart PowerShell.
 - **Scripts are disabled**: for a one-time install session, use `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then run the installer again. Follow your organization's policy on managed devices.
-- **`wpgp` is not recognized**: open a new PowerShell window or dot-source the current-user profile as shown above.
+- **`wpgp` is not recognized**: open a new PowerShell window so it loads the updated `PATH`.
 - **No key matches**: import the recipient's public key and confirm the email/fingerprint shown by `gpg --list-keys`.
 
 ## Security
