@@ -23,7 +23,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\install-windows.ps1
 ```
 
-The process-scoped execution policy change lasts only for that PowerShell window. The installer needs no elevation. It copies `windows\wpgp.ps1` to `Documents\Codex\wpgp`, creates a command launcher, and adds the folder to your per-user `PATH`. Run `wpgp` in the current window or any new PowerShell window.
+The process-scoped execution policy change lasts only for that PowerShell window. The installer needs no elevation. It copies `windows\wpgp.ps1` to `Documents\Codex\wpgp`, creates a command launcher, and tries to add the folder to your per-user `PATH`. If Windows allows that change, open a new PowerShell window and run `wpgp`. If environment-variable changes are blocked, add that folder to PATH manually or invoke the script by full path:
+
+```powershell
+& "$env:USERPROFILE\Documents\Codex\wpgp\wpgp.ps1"
+```
 
 The launcher invokes the script directly. GnuPG stores its keys in your account's normal GnuPG home directory; wpgp does not make another key store.
 
